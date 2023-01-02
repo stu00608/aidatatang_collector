@@ -15,7 +15,8 @@ pip install -r requirements.txt
 python collect_aidatatang_200zh.py -n shen -t contents.txt
 ```
 
-**image here**
+![SCR-20230102-kzz](https://user-images.githubusercontent.com/40068587/210202769-3bf88ab7-acfe-49a8-8f4c-d408bb01fe7a.png)
+
 
 - Press p to record through microphone, the recording will process noise reduction and trimming automatically.
 - Press n to skip this sentence.
@@ -23,4 +24,6 @@ python collect_aidatatang_200zh.py -n shen -t contents.txt
 
 ### Dataset Structure.
 
-**image here**
+![SCR-20230102-kzl](https://user-images.githubusercontent.com/40068587/210202786-ab8a1025-d65f-4f68-8f20-bfcb8a1dca86.png)
+
+
