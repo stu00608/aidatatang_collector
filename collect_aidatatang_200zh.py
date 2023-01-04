@@ -12,6 +12,7 @@ import wave
 import random
 import argparse
 import pyaudio
+import playsound
 import noisereduce as nr
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -35,7 +36,7 @@ def trim_audio(input_file_path, output_file_path):
     duration = len(sound)
     print(
         f"start_trim: {start_trim}, end_trim: {end_trim}, duration: {duration}")
-    trimmed_sound = sound[start_trim:duration-end_trim]
+    trimmed_sound = sound[start_trim:duration+50-end_trim]
     trimmed_sound.export(output_file_path, format="wav")
 
 
@@ -113,25 +114,7 @@ def record_noise(filename):
     print("Done")
 
 
-def record_audio(raw_output_path, wav_output_path, noise_file_path=None):
-    # Record audio
-    try:
-        with mic as source:
-            r.adjust_for_ambient_noise(source)
-            print("Say something!")
-            audio = r.listen(source)
-            print("Got it! Now saving...")
-    except Exception as e:
-        print("Failed to record audio: ", e)
-        return False
-    # Write audio to a WAV file
-    try:
-        with open(raw_output_path, "wb") as f:
-            f.write(audio.get_wav_data())
-    except Exception as e:
-        print("Failed to save audio: ", e)
-        return False
-
+def process_audio(raw_output_path, wav_output_path, noise_file_path=None):
     if noise_file_path == None:
         return
 
@@ -143,7 +126,20 @@ def record_audio(raw_output_path, wav_output_path, noise_file_path=None):
     write_wav(input_rate, data, tmp_denoised_audio)
     trim_audio(tmp_denoised_audio, wav_output_path)
 
-    return True
+
+def record_audio():
+    # Record audio
+    try:
+        with mic as source:
+            r.adjust_for_ambient_noise(source, duration=0.5)
+            print("Say something!")
+            audio = r.listen(source, timeout=5, phrase_time_limit=10)
+            print("Got it!")
+    except Exception as e:
+        print("Failed to record audio: ", e)
+        return False
+
+    return audio
 
 
 def get_random_string():
@@ -251,7 +247,7 @@ if __name__ == "__main__":
 
         os.system("clear")
         print(
-            f"""\n\n{c}\n\nPress:\n[p]: Record and save\n[n]: Pass this text.\n[q]: Quit.\n\n""")
+            f"""\n\n{c}\n\nCurrent Recorded: {index}\n\nPress:\n[p]: Record and save\n[n]: Pass this text\n[q]: Quit\n\n""")
 
         while True:
             tty.setcbreak(sys.stdin)
@@ -264,21 +260,70 @@ if __name__ == "__main__":
                 raw_file_path = os.path.join(raw_audio_folder, file_name)
 
                 # Record audio
-                if record_audio(raw_file_path, wav_file_path, noise_file_path="noise.wav"):
-                    print("Record saved.")
-                else:
+                audio = record_audio()
+                if not audio:
                     print("Record failed.")
                     continue
 
-                index += 1
+                # Save audio to tmp.
+                tmp_file_path = "/tmp/tmp.wav"
+                with open(tmp_file_path, "wb") as f:
+                    f.write(audio.get_wav_data())
 
-                transcript_data = f"{tag} {c}"
+                os.system("clear")
+                print(
+                    f"""\n\n{c}\n\nPress:\n[p]: Play\n[s]: Save\n[r]: Re-record\n[n] Pass this text\n[q]: Quit\n\n""")
+                state = "Continue"
+                while True:
+                    tty.setcbreak(sys.stdin)
+                    # key captures the key-code
+                    sec_key = ord(sys.stdin.read(1))
 
-                transcript_contents.append(c)
-                transcript.append(transcript_data)
-                write_to_file(transcript_path, transcript)
-                record_count += 1
-                break
+                    if sec_key == ord('p'):
+                        print("playing...")
+                        playsound.playsound(tmp_file_path)
+                        print("done")
+                    elif sec_key == ord('s'):
+                        with open(raw_file_path, "wb") as f:
+                            f.write(audio.get_wav_data())
+
+                        process_audio(raw_file_path, wav_file_path,
+                                      noise_file_path="noise.wav")
+
+                        index += 1
+
+                        transcript_data = f"{tag} {c}"
+
+                        transcript_contents.append(c)
+                        transcript.append(transcript_data)
+                        write_to_file(transcript_path, transcript)
+                        record_count += 1
+                        state = "Continue"
+                        break
+                    elif sec_key == ord('r'):
+                        state = "Re-record"
+                        break
+                    elif sec_key == ord('q'):
+                        print("Quit.")
+                        sys.exit()
+                    elif sec_key == ord('n'):
+                        state = "Pass"
+                        break
+
+                if state == "Continue":
+                    break
+                elif state == "Re-record":
+                    os.system("clear")
+                    print(
+                        f"""\n\n{c}\n\nCurrent Recorded: {index}\n\nPress:\n[p]: Record and save\n[n]: Pass this text\n[q]: Quit\n\n""")
+                    continue
+                elif state == "Pass":
+                    print("Go to next sentence.")
+                    passed_transcript.append(c)
+                    write_to_file(passed_transcript_path, passed_transcript)
+                    record_count += 1
+                    break
+
             if key == ord('n'):
                 print("Go to next sentence.")
                 passed_transcript.append(c)
